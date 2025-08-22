@@ -143,12 +143,14 @@ class GenerationExecutorWorker(GenerationExecutor):
         self._lora_manager: Optional[LoraManager] = None
         self._prompt_adapter_manager: Optional[PromptAdapterManager] = None
         self._runtime_model_config: Optional[ModelConfig] = None
+        self._engine_config = None
         if self.rank == 0 and isinstance(self.engine, tllm.Executor):
             if isinstance(engine, Engine):
                 engine_config = engine.config
             else:
                 engine_config = EngineConfig.from_json_file(
                     f"{engine}/config.json")
+            self._engine_config = engine_config
             self._runtime_model_config = _engine_config_to_model_config(
                 engine_config)
             if engine_config.build_config.plugin_config.lora_plugin:
@@ -356,13 +358,22 @@ class GenerationExecutorWorker(GenerationExecutor):
     def _load_lora_adapter(self, lora_request: LoRARequest) -> bool:
         """Returns True if the adapter was loaded by this call, False if it was already loaded"""
         adapter_id = str(lora_request.adapter_id)
+        
+        # Extract plugin config for type validation
+        plugin_config_dict = None
+        if self._engine_config and hasattr(self._engine_config, 'build_config') and hasattr(self._engine_config.build_config, 'plugin_config') and hasattr(self._engine_config.build_config.plugin_config, 'lora_plugin'):
+            plugin_config_dict = {
+                'lora_plugin': self._engine_config.build_config.plugin_config.lora_plugin
+            }
+        
         newly_loaded_uids = self._lora_manager.load_from_ckpt(
             [lora_request.path],
             model_config=self._runtime_model_config if
             self._runtime_model_config is not None else self._lora_model_config,
             runtime_mapping=None,
             uids=[adapter_id],
-            ckpt_source=lora_request.ckpt_source)
+            ckpt_source=lora_request.ckpt_source,
+            plugin_config=plugin_config_dict)
         return adapter_id in newly_loaded_uids
 
     def _load_prompt_adapter(self,

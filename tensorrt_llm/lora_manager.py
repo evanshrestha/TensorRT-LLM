@@ -731,6 +731,7 @@ class LoraManager(object):
         runtime_mapping: Optional[Mapping] = None,
         uids: Optional[List[str]] = None,
         ckpt_source: str = "hf",
+        plugin_config: Optional[Dict] = None,
     ) -> List[str]:
         """Returns the adapter UIDs that were loaded by this call.
 
@@ -743,6 +744,7 @@ class LoraManager(object):
                 model_config=model_config,
                 runtime_mapping=runtime_mapping,
                 uids=uids,
+                plugin_config=plugin_config,
             )
         elif ckpt_source == "nemo":
             # Find all .nemo files from directories or files
@@ -754,6 +756,7 @@ class LoraManager(object):
                 model_config=model_config,
                 runtime_mapping=runtime_mapping,
                 uids=uids,
+                plugin_config=plugin_config,
             )
         else:
             assert False, f"{self.__class__.__name__} does not support source {ckpt_source}"
@@ -764,6 +767,7 @@ class LoraManager(object):
         model_config: Union["ModelConfig", LoraModelConfig],
         runtime_mapping: Optional[Mapping] = None,
         uids: Optional[List[str]] = None,
+        plugin_config: Optional[Dict] = None,
     ) -> List[str]:
         """Returns the adapter UIDs that were loaded by this call.
 
@@ -836,8 +840,21 @@ class LoraManager(object):
                         t_out = None
 
                     if t_in is not None and t_out is not None:
-                        t_in = t_in.cuda().to(str_dtype_to_torch(model_config.dtype)).contiguous()
-                        t_out = t_out.cuda().to(str_dtype_to_torch(model_config.dtype)).contiguous()
+                        target_dtype = str_dtype_to_torch(model_config.dtype)
+                        t_in = t_in.cuda().to(target_dtype).contiguous()
+                        t_out = t_out.cuda().to(target_dtype).contiguous()
+                        
+                        # Validate LoRA plugin dtype matches the storage type used during conversion
+                        if plugin_config is not None and 'lora_plugin' in plugin_config:
+                            plugin_dtype = plugin_config['lora_plugin']
+                            if plugin_dtype and plugin_dtype != model_config.dtype:
+                                logger.warning(
+                                    f"LoRA weights type mismatch detected: "
+                                    f"LoRA plugin configured for '{plugin_dtype}' but model dtype is '{model_config.dtype}'. "
+                                    f"This may cause LoRA weights to not be applied correctly. "
+                                    f"Please ensure --lora_plugin and --storage-type use the same data type during build and conversion."
+                                )
+                        
                         rank = t_in.shape[0]
                         self._lora_uid_to_low_ranks[uid][layer_idx][lora_module] = int(rank)
                         self._lora_weights_pointers_list[uid][layer_idx][lora_module] = [
@@ -883,6 +900,7 @@ class LoraManager(object):
         runtime_mapping: Optional[Mapping] = None,
         uids: Optional[List[str]] = None,
         component: Optional[str] = None,
+        plugin_config: Optional[Dict] = None,
     ) -> List[str]:
         """Returns the adapter UIDs that were loaded by this call.
 
@@ -1099,10 +1117,22 @@ class LoraManager(object):
                     else:
                         scale = float(hf_config["lora_alpha"]) / effective_rank
                     t_out = t_out * scale
-                    t_in = t_in.to(str_dtype_to_torch(model_config.dtype))
-                    t_out = t_out.to(str_dtype_to_torch(model_config.dtype))
+                    target_dtype = str_dtype_to_torch(model_config.dtype)
+                    t_in = t_in.to(target_dtype)
+                    t_out = t_out.to(target_dtype)
                     if is_dora and t_mag is not None:
-                        t_mag = t_mag.to(str_dtype_to_torch(model_config.dtype))
+                        t_mag = t_mag.to(target_dtype)
+                    
+                    # Validate LoRA plugin dtype matches the storage type used during conversion
+                    if plugin_config is not None and 'lora_plugin' in plugin_config:
+                        plugin_dtype = plugin_config['lora_plugin']
+                        if plugin_dtype and plugin_dtype != model_config.dtype:
+                            logger.warning(
+                                f"LoRA weights type mismatch detected: "
+                                f"LoRA plugin configured for '{plugin_dtype}' but model dtype is '{model_config.dtype}'. "
+                                f"This may cause LoRA weights to not be applied correctly. "
+                                f"Please ensure --lora_plugin and --storage-type use the same data type during build and conversion."
+                            )
 
                     self._lora_uid_to_low_ranks[uid][layer_idx][lora_module] = effective_rank
                     self._lora_weights_pointers_list[uid][layer_idx][lora_module] = [

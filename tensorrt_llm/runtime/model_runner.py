@@ -613,10 +613,16 @@ class ModelRunner(ModelRunnerMixin):
         if session.use_lora_plugin:
             lora_manager = LoraManager()
             if lora_dir is not None:
+                # Extract plugin config for type validation
+                plugin_config_dict = {
+                    'lora_plugin': build_config.plugin_config.lora_plugin
+                } if hasattr(build_config, 'plugin_config') and hasattr(build_config.plugin_config, 'lora_plugin') else None
+                
                 lora_manager.load_from_ckpt(lora_dir,
                                             model_config=model_config,
                                             runtime_mapping=runtime_mapping,
-                                            ckpt_source=lora_ckpt_source)
+                                            ckpt_source=lora_ckpt_source,
+                                            plugin_config=plugin_config_dict)
         else:
             lora_manager = None
 
@@ -722,10 +728,16 @@ class ModelRunner(ModelRunnerMixin):
             if session.use_lora_plugin:
                 lora_manager = LoraManager()
                 if lora_dir is not None:
+                    # Extract plugin config for type validation from the engine config
+                    plugin_config_dict = {
+                        'lora_plugin': engine.config.build_config.plugin_config.lora_plugin
+                    } if hasattr(engine.config, 'build_config') and hasattr(engine.config.build_config, 'plugin_config') and hasattr(engine.config.build_config.plugin_config, 'lora_plugin') else None
+                    
                     lora_manager.load_from_ckpt(lora_dir,
                                                 model_config=model_config,
                                                 runtime_mapping=runtime_mapping,
-                                                ckpt_source=lora_ckpt_source)
+                                                ckpt_source=lora_ckpt_source,
+                                                plugin_config=plugin_config_dict)
             else:
                 lora_manager = None
 

@@ -181,6 +181,7 @@ class EncDecModelRunner:
                     model_config=self.encoder_model_config,
                     runtime_mapping=self.encoder_runtime_mapping,
                     component='encoder',
+                    plugin_config=None,
                 )
             else:
                 self.encoder_lora_manager = None
@@ -204,6 +205,7 @@ class EncDecModelRunner:
                 model_config=self.decoder_model_config,
                 runtime_mapping=self.decoder_runtime_mapping,
                 component='decoder',
+                plugin_config=None,
             )
         else:
             self.decoder_lora_manager = None

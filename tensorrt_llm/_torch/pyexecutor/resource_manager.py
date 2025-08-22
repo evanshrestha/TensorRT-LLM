@@ -1057,7 +1057,8 @@ class PeftCacheManager(BaseResourceManager):
                     model_config=self._lora_model_config,
                     runtime_mapping=None,
                     uids=[request.lora_task_id],
-                    ckpt_source=self._lora_config.lora_ckpt_source)
+                    ckpt_source=self._lora_config.lora_ckpt_source,
+                    plugin_config=None)
                 request.lora_weights = self._lora_manager.cpp_lora_weights[
                     request.lora_task_id]
 

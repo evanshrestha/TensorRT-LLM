@@ -290,10 +290,17 @@ class ModelRunnerCpp(ModelRunnerMixin):
                 runtime_model_config = _engine_config_to_model_config(
                     engine_config, gpu_weights_percent=gpu_weights_percent)
                 # For Executor, only rank 0 can enqueue requests, and should hold all lora weights
+                
+                # Extract plugin config for type validation
+                plugin_config_dict = {
+                    'lora_plugin': engine_config.build_config.plugin_config.lora_plugin
+                } if hasattr(engine_config, 'build_config') and hasattr(engine_config.build_config, 'plugin_config') and hasattr(engine_config.build_config.plugin_config, 'lora_plugin') else None
+                
                 lora_manager.load_from_ckpt(lora_dir,
                                             model_config=runtime_model_config,
                                             runtime_mapping=None,
-                                            ckpt_source=lora_ckpt_source)
+                                            ckpt_source=lora_ckpt_source,
+                                            plugin_config=plugin_config_dict)
             else:
                 raise RuntimeError(
                     f"LoRA weights are unspecified and also unavailable in the engine_dir ({engine_dir})."
